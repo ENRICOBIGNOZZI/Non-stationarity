@@ -18,9 +18,13 @@ def _simplex(p):
     if z<=0: raise ValueError("zero probability mass")
     return p/z
 
-def clipped_losses(forecasts,y,scale):
-    scale=max(float(scale),1e-12)
-    return np.clip((np.asarray(forecasts,dtype=float)-float(y))**2/scale,0.,1.)
+def clipped_losses(forecasts,y,bound):
+    """Bounded convex surrogate: squared loss after clipping the observed target."""
+    bound=float(bound)
+    if bound<=0: raise ValueError("bound must be positive")
+    f=np.clip(np.asarray(forecasts,dtype=float),-bound,bound)
+    yc=float(np.clip(y,-bound,bound))
+    return (f-yc)**2/(4*bound*bound)
 
 class AdaHedge:
     """Parameter-free Hedge on bounded losses."""
@@ -58,15 +62,16 @@ class AdaHedge:
         gap=max(0.,hedge-(self._mix_value(self.L+losses,eta)-self._mix_value(self.L,eta)))
         self.L+=losses;self.delta+=gap;self.rounds+=1
         return self
-    def update(self,forecasts,y,scale):
-        return self.update_losses(clipped_losses(forecasts,y,scale))
+    def update(self,forecasts,y,bound):
+        return self.update_losses(clipped_losses(forecasts,y,bound))
 
 class ShareGridAdaHedge:
     """AdaHedge master over a finite grid of fixed-share trackers."""
-    def __init__(self,size,scale,eta_grid=(.25,.5,1.,2.,4.),
+    def __init__(self,size,bound=4.,eta_grid=(.25,.5,1.,2.,4.),
                  share_grid=(0.,1/512,1/128,1/32,1/8),prior=None):
         if size<1: raise ValueError("size must be positive")
-        self.size=size;self.scale=max(float(scale),1e-12)
+        self.size=size;self.bound=float(bound)
+        if self.bound<=0: raise ValueError("bound must be positive")
         self.prior=_simplex(np.ones(size) if prior is None else prior)
         grid=[(float(e),float(a)) for e in eta_grid for a in share_grid]
         if any(e<=0 or a<0 or a>=1 for e,a in grid):raise ValueError("invalid grid")
@@ -82,8 +87,8 @@ class ShareGridAdaHedge:
     def update(self,forecasts,y):
         forecasts=np.asarray(forecasts,dtype=float)
         tpred=self.tracker_forecasts(forecasts)
-        self.master.update_losses(clipped_losses(tpred,y,self.scale))
-        loss=clipped_losses(forecasts,y,self.scale)
+        self.master.update_losses(clipped_losses(tpred,y,self.bound))
+        loss=clipped_losses(forecasts,y,self.bound)
         logp=np.log(np.maximum(self.P,1e-300))-self.eta[:,None]*loss[None,:]
         logp-=logp.max(axis=1,keepdims=True)
         p=np.exp(logp);p/=p.sum(axis=1,keepdims=True)
