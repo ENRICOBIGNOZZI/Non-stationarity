@@ -1,5 +1,87 @@
-# Non-stationarity
+# Joint memory and neural complexity under nonstationarity
 
-Reproducible experiments for joint temporal-memory and neural-model selection under nonstationarity.
+A reproducible, chronological simulation benchmark accompanying the research on
+nonstationary weighted neural regression. It evaluates **joint selection of
+training memory, temporal kernel and neural width**. It does not assume the
+unknown drift exponent, drift amplitude, or changepoints are observed.
 
-This repository is being initialized with a chronological simulation benchmark. Experimental results will distinguish feasible adaptive procedures, oracle diagnostics, and stress tests outside the manuscript assumptions.
+## What is implemented
+
+* A bank of 63 genuinely trainable, one-hidden-layer tanh networks. Widths are
+  4, 12 and 24; memory scales are 32, 96, 256 and 768 observations. Temporal
+  weighting includes uniform windows, exponentials, power tapers, capped power
+  tapers and expanding histories.
+* Causal prequential selection; a paired one-standard-error heuristic;
+  fixed-share and Hedge aggregation; experimental two-axis estimator comparisons.
+* Fixed/selected rolling and exponential neural baselines; River ADWIN and
+  Page-Hinkley neural wrappers; the Mazzetto--Upfal linear-window algorithm;
+  RLS; batch random forests; River Adaptive Random Forest and Hoeffding Adaptive
+  Tree; zero and recent-mean controls.
+* Independent current-distribution integration probes. An explicitly infeasible
+  candidate-grid oracle selects on a **second**, independent set of truth probes.
+* Eighteen DGPs including gradual drift, jumps, changing temporal regularity,
+  recurring targets, spatial complexity changes, covariate-only and noise-only
+  changes. Three stress tests deliberately violate the main theorem assumptions.
+
+The training objective is `sum_s w[t,s] * (Y[s] - f(X[s]))**2`. The main evaluation
+metric is current integrated excess risk, `E_{X~P_t}(f_hat(X)-f_t(X))**2`, estimated
+on independent evaluator-only probes. Realized prequential MSE is reported too.
+
+## Reproduce
+
+Python 3.13 and CPU PyTorch were used in the recorded run. Install the package:
+
+```sh
+python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e '.[test,report]'
+python -m pytest -q
+python -m nonstationarity.experiment --config configs/smoke.json --out results/smoke --jobs 1
+```
+
+For the main experiment, validation horizons are **already frozen** in
+`configs/full.json`. Do not recalibrate them on the test results.
+
+```sh
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+python -m nonstationarity.experiment --config configs/full.json --out results/full --jobs 4
+python -m nonstationarity.analysis --input results/full --out results/analysis
+python -m nonstationarity.temporal_oracle --out results/temporal_oracle
+```
+
+To reproduce the independent development stage:
+
+```sh
+python -m nonstationarity.experiment --config configs/development.json --out results/development --jobs 4
+python -m nonstationarity.calibrate --development results/development --out results/calibration
+```
+
+Use a **new output directory** for code/config changes. `--resume` checks the
+configuration hash, not historical source identity; it is only safe for an
+unchanged code checkout. Each run writes source SHA-256 hashes, dependency
+versions, configuration, per-stream metadata and failures. Final status is
+`complete` only when every requested stream succeeds.
+
+## Protocol and interpretation
+
+Read [PROTOCOL.md](docs/PROTOCOL.md), [METHODS.md](docs/METHODS.md) and
+[LITERATURE.md](docs/LITERATURE.md). Results are in [results/REPORT.md](results/REPORT.md).
+
+Important distinctions:
+
+1. The published bounds concern an explicit finite dictionary/bounded sieve and
+   contain an optimization-error term. These simulations train continuous hidden
+   parameters for a finite number of Adam steps. They do **not** certify global
+   ERM, that optimization error, or a data-driven oracle inequality.
+2. Kernel shape is a tuning parameter, not a consistent estimate of Holder
+   regularity. The capped kernel is a member of the theoretical family, not an
+   estimated solution of the unknown full-bound objective.
+3. The two-axis comparisons and hybrid filter are **unproved heuristics**. They
+   are not relabelled as Mazzetto--Upfal. That paper's linear algorithm is a
+   separate baseline with an exact trust-region discrepancy calculation.
+4. Fixed-share/Hedge predictions combine several neural experts. They are not a
+   single network with a selected width, and their deployment cost is larger.
+5. The scalar oracle Monte Carlo study is a separate mean-estimation experiment,
+   not thousands of additional neural-training streams or a financial backtest.
+
+No claim of state-of-the-art performance, financial profitability, or universal
+optimality follows from this benchmark. Negative comparisons are retained.
