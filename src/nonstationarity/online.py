@@ -8,6 +8,7 @@ import torch
 from .kernels import candidate_grid
 from .neural import NeuralBank
 from .selectors import Prequential, FixedShare
+from .meta import ShareGridAdaHedge, ExtendedExpertPool, sparse_vector
 
 
 class AdaptiveMemoryRegressor:
@@ -21,7 +22,7 @@ class AdaptiveMemoryRegressor:
     def __init__(self, d, *, mode='select', seed=0, histories=(32,96,256,768),
                  widths=(4,12,24), warmup=64, refit_stride=32, score_horizon=256,
                  steps=60, lr=.03, bound=4.):
-        if d<1 or mode not in ('select','one_se','aggregate'):
+        if d<1 or mode not in ('select','one_se','aggregate','adaptive_aggregate','sparse3'):
             raise ValueError('invalid dimension or mode')
         if warmup<2 or refit_stride<1 or score_horizon<1 or steps<1:
             raise ValueError('invalid positive tuning parameters')
@@ -34,6 +35,8 @@ class AdaptiveMemoryRegressor:
         self.bank=NeuralBank(self.specs,d,seed,steps=steps,lr=lr,bound=bound)
         self.selector=Prequential(self.specs,score_horizon,1. if mode=='one_se' else 0.)
         self.aggregate=None
+        self.ext_pool=ExtendedExpertPool(self.specs)
+        self.adaptive=None
         self.X=[];self.y=[];self.pending=None
         self.last_fit=None;self.selected_params_=None
 
@@ -52,11 +55,22 @@ class AdaptiveMemoryRegressor:
             if self.aggregate is None:
                 scale=4*max(.05,float(np.var(self.y[:self.warmup])))
                 self.aggregate=FixedShare(len(self.specs),eta=1.,share=.01,scale=scale,active=self.active)
+            if self.adaptive is None:
+                scale=4*max(.05,float(np.var(self.y[:self.warmup])))
+                self.adaptive=ShareGridAdaHedge(self.ext_pool.size,scale)
             if self.last_fit is None or (n-self.warmup)%self.refit_stride==0:
                 self.bank.fit(np.asarray(self.X),np.asarray(self.y))
                 self.last_fit=n
             candidates=self.bank.predict(x[None,:])[0]
-            if self.mode=='aggregate':
+            if self.mode in ('adaptive_aggregate','sparse3'):
+                recent=float(np.clip(np.mean(self.y[-64:]),-self.bound,self.bound))
+                ext=self.ext_pool.vector(candidates,np.array([0.,recent,0.,0.]))
+                w=self.adaptive.vector()
+                if self.mode=='sparse3': w=sparse_vector(w,3)
+                prediction=float(w@ext)
+                self.selected_params_={'kind':self.mode,**self.ext_pool.diagnostics(w),
+                                       'fit_observations':self.last_fit}
+            elif self.mode=='aggregate':
                 prediction=float(self.aggregate.vector()@candidates)
                 self.selected_params_={'kind':'ensemble','members':len(self.active),'fit_observations':self.last_fit}
             else:
@@ -64,7 +78,11 @@ class AdaptiveMemoryRegressor:
                 prediction=float(candidates[j])
                 self.selected_params_={**self.specs[j].as_dict(),**self.bank.diag[j],
                                        'fit_observations':self.last_fit,'candidate_index':j}
-        self.pending=(x.copy(),candidates)
+        ext_pending=None
+        if candidates is not None and self.mode in ('adaptive_aggregate','sparse3'):
+            recent=float(np.clip(np.mean(self.y[-64:]),-self.bound,self.bound))
+            ext_pending=self.ext_pool.vector(candidates,np.array([0.,recent,0.,0.]))
+        self.pending=(x.copy(),candidates,ext_pending)
         return prediction
 
     def observe(self,y):
@@ -72,9 +90,10 @@ class AdaptiveMemoryRegressor:
             raise RuntimeError('predict_one must precede observe')
         y=float(y)
         if not np.isfinite(y):raise ValueError('response must be finite')
-        x,candidates=self.pending
+        x,candidates,ext_pending=self.pending
         if candidates is not None:
             self.selector.update(candidates,y)
             self.aggregate.update(candidates,y)
+            if ext_pending is not None: self.adaptive.update(ext_pending,y)
         self.X.append(x);self.y.append(y);self.pending=None
         return self
