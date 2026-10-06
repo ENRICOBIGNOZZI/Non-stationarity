@@ -94,3 +94,25 @@ with a specified data-driven selector. We do not invent one and label it theirs.
 The empirical two-axis comparison rule is not a proved neural extension of
 Mazzetto--Upfal or a proved Goldenshluger--Lepski procedure. No SOTA or novelty claim
 is inferred from the current comparisons.
+
+
+## Second-stage adaptive aggregation
+
+The enhanced campaign retains the 63 trained neural candidates and adds four
+deterministic output scales (0.25, 0.5, 0.75, 1) for every candidate, plus zero,
+recent mean and RLS(.99/.995). This produces 256 expert forecasts with no
+additional neural fitting.
+
+AdaHedge_NN uses the 63 original neural experts. AdaHedge_Extended uses all 256.
+ShareGrid_NN and ShareGrid_Extended run 25 fixed-share trackers formed by
+eta in {0.25,0.5,1,2,4} crossed with share in
+{0,1/512,1/128,1/32,1/8}; an AdaHedge master combines their forecasts. The grid
+is frozen before the test campaign. Complexity-prior variants are separately
+labelled empirical ablations. Top-3 and top-5 variants prune only the final
+deployment vector.
+
+The meta loss clips the observed response to [-4,4] and uses squared error divided
+by 64. Expert forecasts are already bounded in the same interval. Hence the
+surrogate is in [0,1] and convex in the issued prediction. Current integrated
+risk is still evaluated on unobserved current-distribution probes and is not
+fed to the meta learner. Detailed regret scope is in ADAPTIVE_AGGREGATION.md.
