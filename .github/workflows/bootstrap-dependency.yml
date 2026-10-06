@@ -12,11 +12,11 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
       - run: |
           python -m pip download --no-deps --only-binary=:all: river==0.22.0 -d wheels
       - uses: actions/upload-artifact@v4
         with:
-          name: river-wheel-cp311
+          name: river-wheel-cp313
           path: wheels/*.whl
           retention-days: 2
