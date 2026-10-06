@@ -24,6 +24,7 @@ from .dgp import Generator, SCENARIOS, STRESS
 from .kernels import candidate_grid, ExpertSpec
 from .neural import NeuralBank
 from .selectors import Prequential, FixedShare, comparison_penalties
+from .meta import AdaHedge, ShareGridAdaHedge, ExtendedExpertPool, sparse_vector
 from .baselines import RLS, MazzettoUpfalLinear, DriftMonitors, RiverModels
 
 
@@ -85,6 +86,15 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
         "Hedge_all": FixedShare(K, eta=1., share=0., scale=score_scale),
     }
     rls = {"RLS_099": RLS(d,.99), "RLS_0995": RLS(d,.995)}
+    # Second-stage expert pool. Shrinkage creates no extra NN fits.
+    ext_pool = ExtendedExpertPool(specs, tuple(config.get("shrinkages",[.25,.5,.75,1.])))
+    meta_scale = score_scale
+    ada_nn = AdaHedge(K)
+    ada_ext = AdaHedge(ext_pool.size)
+    ada_prior = AdaHedge(ext_pool.size, prior=ext_pool.complexity_prior())
+    share_nn = ShareGridAdaHedge(K,meta_scale)
+    share_ext = ShareGridAdaHedge(ext_pool.size,meta_scale)
+    share_prior = ShareGridAdaHedge(ext_pool.size,meta_scale,prior=ext_pool.complexity_prior())
     mu = {"MU_linear_conservative": MazzettoUpfalLinear(d),
           "MU_linear_tuned": MazzettoUpfalLinear(d, threshold_scale=config.get("mu_threshold_scale",.01))}
     # All baselines receive every historical row; none sees t before predicting t.
@@ -152,12 +162,30 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
         bank_predictions[t] = p
         pred = {name:float(p_all[j]) for name,j in choice.items()}
         pred.update({name:float(v@p) for name,v in mixture_vectors.items()})
-        pred.update({name:float(model.predict(X[t:t+1])[0]) for name,model in rls.items()})
+        rls_pred={name:float(model.predict(X[t:t+1])[0]) for name,model in rls.items()}
+        pred.update(rls_pred)
+        recent=float(np.clip(np.mean(y[max(0,t-64):t]),-4.,4.))
+        simple=np.array([0.,recent,rls_pred["RLS_099"],rls_pred["RLS_0995"]])
+        ext=ext_pool.vector(p,simple)
+        advanced_vectors={
+            "AdaHedge_NN":ada_nn.vector(),
+            "ShareGrid_NN":share_nn.vector(),
+            "AdaHedge_Extended":ada_ext.vector(),
+            "AdaHedge_ComplexityPrior":ada_prior.vector(),
+            "ShareGrid_Extended":share_ext.vector(),
+            "ShareGrid_ComplexityPrior":share_prior.vector(),
+        }
+        pred["AdaHedge_NN"]=float(advanced_vectors["AdaHedge_NN"]@p)
+        pred["ShareGrid_NN"]=float(advanced_vectors["ShareGrid_NN"]@p)
+        for name in ("AdaHedge_Extended","AdaHedge_ComplexityPrior","ShareGrid_Extended","ShareGrid_ComplexityPrior"):
+            pred[name]=float(advanced_vectors[name]@ext)
+        pred["ShareGrid_Extended_Top3"]=float(sparse_vector(advanced_vectors["ShareGrid_Extended"],3)@ext)
+        pred["ShareGrid_Extended_Top5"]=float(sparse_vector(advanced_vectors["ShareGrid_Extended"],5)@ext)
         pred.update({name:float(model.predict(X[t:t+1])[0]) for name,model in mu.items()})
         pred.update({name:float(model.predict(X[t:t+1])[0]) for name,model in rf.items()})
         if online:
             pred.update({name:float(v[0]) for name,v in online.predict(X[t:t+1]).items()})
-        pred["Mean_recent"] = float(np.mean(y[max(0,t-64):t]))
+        pred["Mean_recent"] = recent
         pred["Zero"] = 0.
         if is_refit and t >= burn and nprobe:
             xp, truth = generator.probes(t, nprobe, 0)
@@ -168,7 +196,17 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
             eval_times.append(t)
             evaluated = {name:pp_all[:,j] for name,j in choice.items()}
             evaluated.update({name:pp@v for name,v in mixture_vectors.items()})
-            evaluated.update({name:model.predict(xp) for name,model in rls.items()})
+            rls_probe={name:model.predict(xp) for name,model in rls.items()}
+            evaluated.update(rls_probe)
+            simple_probe=np.column_stack([np.zeros(nprobe),np.full(nprobe,recent),
+                                          rls_probe["RLS_099"],rls_probe["RLS_0995"]])
+            ext_probe=ext_pool.matrix(pp,simple_probe)
+            evaluated["AdaHedge_NN"]=pp@advanced_vectors["AdaHedge_NN"]
+            evaluated["ShareGrid_NN"]=pp@advanced_vectors["ShareGrid_NN"]
+            for name in ("AdaHedge_Extended","AdaHedge_ComplexityPrior","ShareGrid_Extended","ShareGrid_ComplexityPrior"):
+                evaluated[name]=ext_probe@advanced_vectors[name]
+            evaluated["ShareGrid_Extended_Top3"]=ext_probe@sparse_vector(advanced_vectors["ShareGrid_Extended"],3)
+            evaluated["ShareGrid_Extended_Top5"]=ext_probe@sparse_vector(advanced_vectors["ShareGrid_Extended"],5)
             evaluated.update({name:model.predict(xp) for name,model in mu.items()})
             evaluated.update({name:model.predict(xp) for name,model in rf.items()})
             if online: evaluated.update(online.predict(xp))
@@ -186,6 +224,7 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
                 j = c_eval.get(name)
                 info = bank.diag[j] if j is not None else {}
                 sp = specs_all[j] if j is not None else None
+                md=ext_pool.diagnostics(advanced_vectors[name]) if name in advanced_vectors and len(advanced_vectors[name])==ext_pool.size else {}
                 logs.append({"scenario":scenario,"seed":seed,"t":t,"method":name,
                     "excess_risk":float(np.mean((np.asarray(values)-truth)**2)),
                     "post_break_64":int(after_break),
@@ -193,7 +232,11 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
                     "shape":sp.shape if sp else np.nan,"kernel":sp.kind if sp else "mixture_or_external",
                     "neff":info.get("neff",np.nan),"support":info.get("support",np.nan),
                     "v_over_q":info.get("v_over_q",np.nan),
-                    "selected":j if j is not None else -1})
+                    "selected":j if j is not None else -1,
+                    "meta_effective_experts":md.get("meta_effective_experts",np.nan),
+                    "meta_zero_mass":md.get("meta_zero_mass",np.nan),
+                    "meta_neural_mass":md.get("meta_neural_mass",np.nan),
+                    "meta_top_weight":md.get("meta_top_weight",np.nan)})
         selections.append({"t":t,**{k:int(v) for k,v in choice.items()}})
         # The response is used only below: score, detect, then update online learners.
         yy = float(y[t])
@@ -202,6 +245,9 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
             for name,value in pred.items(): loss_sums[name] = loss_sums.get(name,0.)+(value-yy)**2
         for selector in selectors.values(): selector.update(p,yy)
         for mix in mixes.values(): mix.update(p,yy)
+        ada_nn.update(p,yy,meta_scale); share_nn.update(p,yy)
+        ada_ext.update(ext,yy,meta_scale); ada_prior.update(ext,yy,meta_scale)
+        share_ext.update(ext,yy); share_prior.update(ext,yy)
         if detectors:
             detectors.update(t,(pred["ADWIN_NN"]-yy)**2,(pred["PageHinkley_NN"]-yy)**2,score_scale)
         tick = time.perf_counter()
@@ -227,7 +273,7 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
     pd.DataFrame(selections).to_csv(out/"selections.csv",index=False)
     np.savez_compressed(out/"candidate_ledger.npz", predictions=bank_predictions,
                         y=y, eval_times=np.array(eval_times),risk=np.array(candidate_risks))
-    meta = {"scenario":scenario,"seed":seed,"T":T,"d":d,"candidate_count":K,
+    meta = {"scenario":scenario,"seed":seed,"T":T,"d":d,"candidate_count":K,"extended_expert_count":ext_pool.size,
         "neural_fits":bank.nfits,"evaluation_times":eval_times,"breakpoints":generator.breakpoints,
         "stress":STRESS.get(scenario),"seconds":time.perf_counter()-started,"component_seconds":times,
         "detector_alarms":detectors.alarms if detectors else {},
