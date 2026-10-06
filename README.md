@@ -68,7 +68,7 @@ Read [PROTOCOL.md](docs/PROTOCOL.md), [METHODS.md](docs/METHODS.md) and
 
 Important distinctions:
 
-1. The published bounds concern an explicit finite dictionary/bounded sieve and
+1. The reported bounds concern an explicit finite dictionary/bounded sieve and
    contain an optimization-error term. These simulations train continuous hidden
    parameters for a finite number of Adam steps. They do **not** certify global
    ERM, that optimization error, or a data-driven oracle inequality.
@@ -85,3 +85,21 @@ Important distinctions:
 
 No claim of state-of-the-art performance, financial profitability, or universal
 optimality follows from this benchmark. Negative comparisons are retained.
+
+## Use with an arbitrary observed stream
+
+```python
+from nonstationarity.online import AdaptiveMemoryRegressor
+
+model = AdaptiveMemoryRegressor(d=4, mode="select", seed=7)
+for x, y in observed_stream:
+    prediction = model.predict_one(x)  # y has not been supplied to the model
+    model.observe(y)
+    diagnostics = model.selected_params_
+```
+
+Use `mode="one_se"` for the parsimony heuristic or `mode="aggregate"` for a
+fixed-share mixture. The first 64 forecasts use a bounded past mean; scores and
+fits are then updated causally. This is a reference implementation, not a
+constant-memory production service. Retained history, CPU refits and ensemble
+inference costs must be budgeted separately.

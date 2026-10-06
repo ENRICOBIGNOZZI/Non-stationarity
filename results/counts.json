@@ -1,0 +1,50 @@
+{
+  "status": "complete",
+  "scenarios": 18,
+  "replications_per_scenario": 20,
+  "neural_streams": 360,
+  "methods_including_oracle": 29,
+  "feasible_methods": 28,
+  "candidate_configs": 63,
+  "neural_fits": 514800,
+  "stream_time_evaluations": 7200,
+  "risk_cells": 208800,
+  "observations_per_stream": 768,
+  "wall_seconds": 1525.345008989,
+  "sum_stream_seconds": 6081.848998609996,
+  "component_seconds": {
+    "neural_fit": 3394.0286026629738,
+    "forest_fit": 497.53076545901376,
+    "mu_fit": 41.739560420006,
+    "online": 387.3186025900304
+  },
+  "bootstrap_draws": 10000,
+  "bootstrap_unit": "seed cluster across all scenarios",
+  "confidence_intervals": "pointwise percentile bootstrap; not simultaneous, no multiplicity correction",
+  "source_sha256": {
+    "dgp.py": "85fd1361853061110f556f875457ccd243e745647bcc9ee3a6565bfe58673322",
+    "calibrate.py": "22fe3fb6a09c635e8ea397e3d0831c910e2172f50c76e01b344eb43fc01af760",
+    "neural.py": "04810554d8edd81ea215aca562020d9de95bf95688a9a25d5274d64596871a28",
+    "selectors.py": "c5de410a1f27ab9061111eb702d2d149e364cb8063c377c4f8f4c0af0d20856e",
+    "kernels.py": "021f08ba66e7d82b84eeb3a17786786ca43ea96e3d9d975be6ab6afa2b3cfcd7",
+    "experiment.py": "3e5a66887120fedc7db270d34e84eda82a6d532d82778cf840ca3bfc07ad16bf",
+    "baselines.py": "564515808a2cb3126d8a96c9a8e5c2f47803b74dfd577d9f11f4c5f0250034f5",
+    "oracle_weights.py": "efc5d40ea0a3260ef182c394a037398c2f95b88ac3880c74c1e3485923c38633",
+    "__init__.py": "86930bd29c200ba43fcb2bb2ccf385ccc29a2771d884d6b250a68bf5dc5986b3"
+  },
+  "config": {
+    "T": 768, "d": 4, "start": 64, "burnin": 128,
+    "refit_stride": 32, "probes": 256, "oracle_probes": 512,
+    "steps": 60, "lr": 0.03,
+    "histories": [32, 96, 256, 768], "widths": [4, 12, 24],
+    "river": true, "random_forest": true, "rf_trees": 32,
+    "seeds": [1000,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016,1017,1018,1019],
+    "scenarios": ["stationary_linear","stationary_nonlinear","slow_smooth","fast_smooth","holder_half","single_jump","multiple_jumps","piecewise_holder","recurring","complexity_change","covariate_only","joint_shift","volatility_only","heteroskedastic","low_signal","heavy_tails","serial_noise","support_shift"],
+    "selection_memories": {
+      "Exponential_CV": 256, "Joint_1SE": 256, "Joint_CV": 256,
+      "Memory_only_CV": 64, "Power_CV_matched": 256,
+      "Uniform_CV": 128, "Width_only_CV": 256
+    },
+    "mu_threshold_scale": 0.01, "lepski_threshold": 0.25
+  }
+}
