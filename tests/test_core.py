@@ -11,6 +11,7 @@ from nonstationarity.baselines import trust_region, linear_discrepancy, Mazzetto
 from nonstationarity.dgp import Generator, SCENARIOS, tilt_uniform
 from nonstationarity.neural import NeuralBank, project_l1_rows
 from nonstationarity.selectors import Prequential, FixedShare
+from nonstationarity.meta import AdaHedge, ShareGridAdaHedge, ExtendedExpertPool, sparse_vector
 
 @pytest.mark.parametrize("kind", ["uniform","power","capped","exponential","expanding"])
 @pytest.mark.parametrize("n", [1,7,100])
@@ -139,3 +140,40 @@ def test_future_perturbation_does_not_change_prefix(tmp_path):
     p=pd.read_csv(tmp_path/'a'/'single_jump__15'/'prequential.csv')
     q=pd.read_csv(tmp_path/'b'/'single_jump__15'/'prequential.csv')
     pd.testing.assert_frame_equal(p[p.t<120],q[q.t<120])
+
+
+def test_adahedge_concentrates_on_persistent_winner():
+    a=AdaHedge(3)
+    for _ in range(200):
+        a.update_losses(np.array([0.,.5,1.]))
+    assert a.vector()[0] > .95
+    assert np.isclose(a.vector().sum(),1)
+
+def test_share_grid_and_sparse_simplex():
+    s=ShareGridAdaHedge(5,scale=1.)
+    for _ in range(100):
+        s.update(np.array([0.,.3,.6,.9,1.2]),0.)
+    w=s.vector()
+    assert np.isclose(w.sum(),1) and (w>=0).all()
+    z=sparse_vector(w,3)
+    assert np.isclose(z.sum(),1) and np.count_nonzero(z)<=3
+
+def test_extended_pool_contains_exact_zero_and_shrinkage():
+    specs=candidate_grid([32],[4])
+    pool=ExtendedExpertPool(specs)
+    p=np.arange(len(specs),dtype=float)+1
+    q=pool.vector(p,np.array([0.,2.,3.,4.]))
+    assert q[pool.zero_index]==0.
+    assert np.allclose(q[:len(specs)],.25*p)
+    assert pool.size==4*len(specs)+4
+
+def test_online_adaptive_aggregate_protocol():
+    from nonstationarity.online import AdaptiveMemoryRegressor
+    rng=np.random.default_rng(44)
+    model=AdaptiveMemoryRegressor(2,mode='adaptive_aggregate',warmup=8,refit_stride=4,
+                                  histories=(4,8),widths=(2,4),steps=3)
+    for _ in range(20):
+        x=rng.normal(size=2).astype('float32')
+        pred=model.predict_one(x)
+        assert np.isfinite(pred)
+        model.observe(float(rng.normal()))
