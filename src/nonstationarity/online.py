@@ -35,7 +35,7 @@ class AdaptiveMemoryRegressor:
         self.bank=NeuralBank(self.specs,d,seed,steps=steps,lr=lr,bound=bound)
         self.selector=Prequential(self.specs,score_horizon,1. if mode=='one_se' else 0.)
         self.aggregate=None
-        self.ext_pool=ExtendedExpertPool(self.specs)
+        self.ext_pool=ExtendedExpertPool(self.specs, simple_names=('zero','recent_mean'))
         self.adaptive=None
         self.X=[];self.y=[];self.pending=None
         self.last_fit=None;self.selected_params_=None
@@ -64,7 +64,7 @@ class AdaptiveMemoryRegressor:
             candidates=self.bank.predict(x[None,:])[0]
             if self.mode in ('adaptive_aggregate','sparse3'):
                 recent=float(np.clip(np.mean(self.y[-64:]),-self.bound,self.bound))
-                ext=self.ext_pool.vector(candidates,np.array([0.,recent,0.,0.]))
+                ext=self.ext_pool.vector(candidates,np.array([0.,recent]))
                 w=self.adaptive.vector()
                 if self.mode=='sparse3': w=sparse_vector(w,3)
                 prediction=float(w@ext)
