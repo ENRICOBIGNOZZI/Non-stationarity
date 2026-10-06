@@ -150,7 +150,7 @@ def test_adahedge_concentrates_on_persistent_winner():
     assert np.isclose(a.vector().sum(),1)
 
 def test_share_grid_and_sparse_simplex():
-    s=ShareGridAdaHedge(5,scale=1.)
+    s=ShareGridAdaHedge(5,bound=1.)
     for _ in range(100):
         s.update(np.array([0.,.3,.6,.9,1.2]),0.)
     w=s.vector()
