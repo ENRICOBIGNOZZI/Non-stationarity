@@ -76,7 +76,7 @@ versions, configuration, per-stream metadata and failures. Final status is
 ## Protocol and interpretation
 
 Read [PROTOCOL.md](docs/PROTOCOL.md), [METHODS.md](docs/METHODS.md) and
-[LITERATURE.md](docs/LITERATURE.md). Results are in [results/REPORT.md](results/REPORT.md).
+[LITERATURE.md](docs/LITERATURE.md). First-campaign results are in [results/REPORT.md](results/REPORT.md). The fresh adaptive-aggregation campaign is in [results/ENHANCED_REPORT.md](results/ENHANCED_REPORT.md).
 
 Important distinctions:
 
