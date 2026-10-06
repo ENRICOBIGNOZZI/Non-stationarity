@@ -88,13 +88,13 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
     rls = {"RLS_099": RLS(d,.99), "RLS_0995": RLS(d,.995)}
     # Second-stage expert pool. Shrinkage creates no extra NN fits.
     ext_pool = ExtendedExpertPool(specs, tuple(config.get("shrinkages",[.25,.5,.75,1.])))
-    meta_scale = score_scale
+    meta_bound = 4.
     ada_nn = AdaHedge(K)
     ada_ext = AdaHedge(ext_pool.size)
     ada_prior = AdaHedge(ext_pool.size, prior=ext_pool.complexity_prior())
-    share_nn = ShareGridAdaHedge(K,meta_scale)
-    share_ext = ShareGridAdaHedge(ext_pool.size,meta_scale)
-    share_prior = ShareGridAdaHedge(ext_pool.size,meta_scale,prior=ext_pool.complexity_prior())
+    share_nn = ShareGridAdaHedge(K,bound=meta_bound)
+    share_ext = ShareGridAdaHedge(ext_pool.size,bound=meta_bound)
+    share_prior = ShareGridAdaHedge(ext_pool.size,bound=meta_bound,prior=ext_pool.complexity_prior())
     mu = {"MU_linear_conservative": MazzettoUpfalLinear(d),
           "MU_linear_tuned": MazzettoUpfalLinear(d, threshold_scale=config.get("mu_threshold_scale",.01))}
     # All baselines receive every historical row; none sees t before predicting t.
@@ -245,8 +245,8 @@ def run_stream(config, scenario, seed, out_dir, supplied=None):
             for name,value in pred.items(): loss_sums[name] = loss_sums.get(name,0.)+(value-yy)**2
         for selector in selectors.values(): selector.update(p,yy)
         for mix in mixes.values(): mix.update(p,yy)
-        ada_nn.update(p,yy,meta_scale); share_nn.update(p,yy)
-        ada_ext.update(ext,yy,meta_scale); ada_prior.update(ext,yy,meta_scale)
+        ada_nn.update(p,yy,meta_bound); share_nn.update(p,yy)
+        ada_ext.update(ext,yy,meta_bound); ada_prior.update(ext,yy,meta_bound)
         share_ext.update(ext,yy); share_prior.update(ext,yy)
         if detectors:
             detectors.update(t,(pred["ADWIN_NN"]-yy)**2,(pred["PageHinkley_NN"]-yy)**2,score_scale)
