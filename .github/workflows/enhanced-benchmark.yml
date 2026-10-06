@@ -4,6 +4,10 @@ on:
     branches: [research/joint-memory-benchmark]
     paths:
       - src/nonstationarity/meta.py
+      - src/nonstationarity/experiment.py
+      - src/nonstationarity/analysis.py
+      - src/nonstationarity/online.py
+      - tests/test_core.py
       - configs/enhanced_full.json
       - .github/workflows/enhanced-benchmark.yml
 permissions:
