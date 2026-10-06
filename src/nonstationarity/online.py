@@ -80,7 +80,7 @@ class AdaptiveMemoryRegressor:
         ext_pending=None
         if candidates is not None and self.mode in ('adaptive_aggregate','sparse3'):
             recent=float(np.clip(np.mean(self.y[-64:]),-self.bound,self.bound))
-            ext_pending=self.ext_pool.vector(candidates,np.array([0.,recent,0.,0.]))
+            ext_pending=self.ext_pool.vector(candidates,np.array([0.,recent]))
         self.pending=(x.copy(),candidates,ext_pending)
         return prediction
 
