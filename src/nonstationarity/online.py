@@ -56,8 +56,7 @@ class AdaptiveMemoryRegressor:
                 scale=4*max(.05,float(np.var(self.y[:self.warmup])))
                 self.aggregate=FixedShare(len(self.specs),eta=1.,share=.01,scale=scale,active=self.active)
             if self.adaptive is None:
-                scale=4*max(.05,float(np.var(self.y[:self.warmup])))
-                self.adaptive=ShareGridAdaHedge(self.ext_pool.size,scale)
+                self.adaptive=ShareGridAdaHedge(self.ext_pool.size,bound=self.bound)
             if self.last_fit is None or (n-self.warmup)%self.refit_stride==0:
                 self.bank.fit(np.asarray(self.X),np.asarray(self.y))
                 self.last_fit=n
