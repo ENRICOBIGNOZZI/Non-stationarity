@@ -7,6 +7,18 @@ unknown drift exponent, drift amplitude, or changepoints are observed.
 
 ## What is implemented
 
+The second-stage practical algorithm adds parameter-free AdaHedge and an
+AdaHedge-over-fixed-share-grid master. The richer pool contains output-shrunk
+copies of every neural memory together with zero, recent-mean and recursive-linear
+fallbacks. The master can therefore use exponential weighting when it is best,
+shrink toward zero in weak-signal periods, and track changing experts without
+estimating breakpoints or a single fixed switching rate. Full, top-3 and top-5
+deployment variants are benchmarked.
+
+The meta guarantee concerns a bounded convex online surrogate; it is not relabelled
+as an instantaneous L2(P_t) oracle theorem. See docs/ADAPTIVE_AGGREGATION.md.
+
+
 * A bank of 63 genuinely trainable, one-hidden-layer tanh networks. Widths are
   4, 12 and 24; memory scales are 32, 96, 256 and 768 observations. Temporal
   weighting includes uniform windows, exponentials, power tapers, capped power
