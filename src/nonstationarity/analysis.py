@@ -50,7 +50,7 @@ def analyze(root, out, n_bootstrap=10000):
                 'seeds':len(seeds),'infeasible':m=='Oracle_grid','stress':s in STRESS})
     pd.DataFrame(by_scenario).to_csv(out/'scenario_results.csv',index=False)
     overall=[];paired=[]
-    targets=['Joint_CV','Joint_1SE','Joint_FixedShare','Power_CV_matched','Joint_Lepski','Joint_Hybrid']
+    targets=['Joint_CV','Joint_1SE','Joint_FixedShare','Power_CV_matched','Joint_Lepski','Joint_Hybrid','AdaHedge_NN','ShareGrid_NN','AdaHedge_Extended','AdaHedge_ComplexityPrior','ShareGrid_Extended','ShareGrid_ComplexityPrior','ShareGrid_Extended_Top3','ShareGrid_Extended_Top5']
     groups={'all':np.arange(len(scenarios)),
             'within_sampling_assumptions':np.array([i for i,s in enumerate(scenarios) if s not in STRESS]),
             'stress':np.array([i for i,s in enumerate(scenarios) if s in STRESS])}
