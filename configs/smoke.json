@@ -1,0 +1,1 @@
+{"T":192,"d":4,"start":64,"burnin":96,"refit_stride":32,"probes":64,"oracle_probes":128,"steps":25,"lr":0.03,"histories":[32,96,256,768],"widths":[4,12,24],"river":false,"random_forest":false,"seeds":[11],"scenarios":["single_jump","stationary_nonlinear"],"selection_memories":{}}

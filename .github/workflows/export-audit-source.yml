@@ -1,0 +1,21 @@
+name: Export pinned paper audit source
+on:
+  push:
+    branches: [research/joint-memory-benchmark]
+    paths: [.github/workflows/export-audit-source.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c47bdfc4d6b2341c8d43022d309fd8f86c597bba
+      - run: git archive --format=zip --prefix=repository/ HEAD > pinned-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinned-paper-audit-source
+          path: pinned-source.zip
+          retention-days: 7

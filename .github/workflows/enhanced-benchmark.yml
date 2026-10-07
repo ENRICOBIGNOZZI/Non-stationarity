@@ -1,0 +1,42 @@
+name: Enhanced adaptive aggregation benchmark
+on:
+  push:
+    branches: [research/joint-memory-benchmark]
+    paths:
+      - src/nonstationarity/meta.py
+      - src/nonstationarity/experiment.py
+      - src/nonstationarity/analysis.py
+      - src/nonstationarity/online.py
+      - tests/test_core.py
+      - configs/enhanced_full.json
+      - .github/workflows/enhanced-benchmark.yml
+permissions:
+  contents: read
+jobs:
+  enhanced:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: |
+          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e '.[test,report]'
+      - run: python -m pytest -q
+      - run: python -m nonstationarity.experiment --config configs/enhanced_full.json --out results/enhanced --jobs 2
+      - run: python -m nonstationarity.analysis --input results/enhanced --out results/enhanced_analysis
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enhanced-adaptive-results
+          path: |
+            results/enhanced
+            results/enhanced_analysis
+          retention-days: 30

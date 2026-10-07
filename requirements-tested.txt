@@ -1,0 +1,10 @@
+# Recorded CPU runtime: Python 3.13.5; torch wheel index is documented in README.
+numpy==2.3.5
+scipy==1.17.0
+pandas==2.2.3
+torch==2.10.0+cpu
+scikit-learn==1.8.0
+threadpoolctl==3.6.0
+river==0.22.0
+pytest==9.0.2
+matplotlib==3.10.8

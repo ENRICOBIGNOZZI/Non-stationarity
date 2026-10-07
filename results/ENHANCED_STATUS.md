@@ -1,0 +1,1 @@
+Enhanced adaptive aggregation benchmark: COMPLETE. See ENHANCED_REPORT.md. Full raw artifact: GitHub Actions run 37526345354, `enhanced-adaptive-results`.\n
