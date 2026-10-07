@@ -1,0 +1,25 @@
+name: Paper source snapshot
+on:
+  push:
+    branches: [research/joint-memory-benchmark]
+    paths: [.github/workflows/paper-source-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          mkdir -p snapshots
+          git archive --format=zip --prefix=enhanced_source/ d8e32863fa80d4cc41dccf72fac2a141f5332033 > snapshots/enhanced_source.zip
+          git archive --format=zip --prefix=theorem_source/ adc6fa42303768a5f6943e0e15b09419bc8d929b > snapshots/theorem_source.zip
+          sha256sum snapshots/*.zip > snapshots/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paper-source-snapshot
+          path: snapshots
+          retention-days: 14
